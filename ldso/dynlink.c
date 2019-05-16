@@ -25,6 +25,11 @@
 #include "dynlink.h"
 #include "malloc_impl.h"
 
+void *__ldso_malloc(size_t n);
+void *__ldso_calloc(size_t m, size_t n);
+void *__ldso_realloc(void *p, size_t n);
+void __ldso_free(void *p);
+
 static void error(const char *, ...);
 
 #define MAXP2(a,b) (-(-(a)&-(b)))
@@ -451,7 +456,7 @@ static void do_relocs(struct dso *dso, size_t *rel, size_t rel_size, size_t stri
 		case REL_TLSDESC:
 			if (stride<3) addend = reloc_addr[1];
 			if (runtime && def.dso->tls_id > static_tls_cnt) {
-				struct td_index *new = malloc(sizeof *new);
+				struct td_index *new = __ldso_malloc(sizeof *new);
 				if (!new) {
 					error(
 					"Error relocating %s: cannot allocate TLSDESC for %s",
@@ -504,7 +509,7 @@ static void redo_lazy_relocs()
 			p->lazy_next = lazy_head;
 			lazy_head = p;
 		} else {
-			free(p->lazy);
+			__ldso_free(p->lazy);
 			p->lazy = 0;
 			p->lazy_next = 0;
 		}
@@ -577,7 +582,7 @@ static void unmap_library(struct dso *dso)
 			munmap((void *)dso->loadmap->segs[i].addr,
 				dso->loadmap->segs[i].p_memsz);
 		}
-		free(dso->loadmap);
+		__ldso_free(dso->loadmap);
 	} else if (dso->map && dso->map_len) {
 		munmap(dso->map, dso->map_len);
 	}
@@ -607,7 +612,7 @@ static void *map_library(int fd, struct dso *dso)
 		goto noexec;
 	phsize = eh->e_phentsize * eh->e_phnum;
 	if (phsize > sizeof buf - sizeof *eh) {
-		allocated_buf = malloc(phsize);
+		allocated_buf = __ldso_malloc(phsize);
 		if (!allocated_buf) return 0;
 		l = pread(fd, allocated_buf, phsize, eh->e_phoff);
 		if (l < 0) goto error;
@@ -654,7 +659,7 @@ static void *map_library(int fd, struct dso *dso)
 	}
 	if (!dyn) goto noexec;
 	if (DL_FDPIC && !(eh->e_flags & FDPIC_CONSTDISP_FLAG)) {
-		dso->loadmap = calloc(1, sizeof *dso->loadmap
+		dso->loadmap = __ldso_calloc(1, sizeof *dso->loadmap
 			+ nsegs * sizeof *dso->loadmap->segs);
 		if (!dso->loadmap) goto error;
 		dso->loadmap->nsegs = nsegs;
@@ -759,13 +764,13 @@ done_mapping:
 	dso->base = base;
 	dso->dynv = laddr(dso, dyn);
 	if (dso->tls.size) dso->tls.image = laddr(dso, tls_image);
-	free(allocated_buf);
+	__ldso_free(allocated_buf);
 	return map;
 noexec:
 	errno = ENOEXEC;
 error:
 	if (map!=MAP_FAILED) unmap_library(dso);
-	free(allocated_buf);
+	__ldso_free(allocated_buf);
 	return 0;
 }
 
@@ -854,7 +859,7 @@ static int fixup_rpath(struct dso *p, char *buf, size_t buf_size)
 	/* Disallow non-absolute origins for suid/sgid/AT_SECURE. */
 	if (libc.secure && *origin != '/')
 		return 0;
-	p->rpath = malloc(strlen(p->rpath_orig) + n*l + 1);
+	p->rpath = __ldso_malloc(strlen(p->rpath_orig) + n*l + 1);
 	if (!p->rpath) return -1;
 
 	d = p->rpath;
@@ -933,7 +938,7 @@ static void makefuncdescs(struct dso *p)
 		p->funcdescs = dl_mmap(size);
 		self_done = 1;
 	} else {
-		p->funcdescs = malloc(size);
+		p->funcdescs = __ldso_malloc(size);
 	}
 	if (!p->funcdescs) {
 		if (!runtime) a_crash();
@@ -1046,7 +1051,7 @@ static struct dso *load_library(const char *name, struct dso *needed_by)
 				FILE *f = fopen(etc_ldso_path, "rbe");
 				if (f) {
 					if (getdelim(&sys_path, (size_t[1]){0}, 0, f) <= 0) {
-						free(sys_path);
+						__ldso_free(sys_path);
 						sys_path = "";
 					}
 					fclose(f);
@@ -1107,7 +1112,7 @@ static struct dso *load_library(const char *name, struct dso *needed_by)
 		if (n_th > SSIZE_MAX / per_th) alloc_size = SIZE_MAX;
 		else alloc_size += n_th * per_th;
 	}
-	p = calloc(1, alloc_size);
+	p = __ldso_calloc(1, alloc_size);
 	if (!p) {
 		unmap_library(&temp_dso);
 		return 0;
@@ -1167,7 +1172,7 @@ static void load_direct_deps(struct dso *p)
 	/* Use builtin buffer for apps with no external deps, to
 	 * preserve property of no runtime failure paths. */
 	p->deps = (p==head && cnt<2) ? builtin_deps :
-		calloc(cnt+1, sizeof *p->deps);
+		__ldso_calloc(cnt+1, sizeof *p->deps);
 	if (!p->deps) {
 		error("Error loading dependencies for %s", p->name);
 		if (runtime) longjmp(*rtld_fail, 1);
@@ -1224,8 +1229,8 @@ static void extend_bfs_deps(struct dso *p)
 		for (j=cnt=0; j<dep->ndeps_direct; j++)
 			if (!dep->deps[j]->mark) cnt++;
 		tmp = no_realloc ? 
-			malloc(sizeof(*tmp) * (ndeps_all+cnt+1)) :
-			realloc(p->deps, sizeof(*tmp) * (ndeps_all+cnt+1));
+			__ldso_malloc(sizeof(*tmp) * (ndeps_all+cnt+1)) :
+			__ldso_realloc(p->deps, sizeof(*tmp) * (ndeps_all+cnt+1));
 		if (!tmp) {
 			error("Error recording dependencies for %s", p->name);
 			if (runtime) longjmp(*rtld_fail, 1);
@@ -1410,7 +1415,7 @@ static struct dso **queue_ctors(struct dso *dso)
 	if (dso==head && cnt <= countof(builtin_ctor_queue))
 		queue = builtin_ctor_queue;
 	else
-		queue = calloc(cnt, sizeof *queue);
+		queue = __ldso_calloc(cnt, sizeof *queue);
 
 	if (!queue) {
 		error("Error allocating constructor queue: %m\n");
@@ -1493,7 +1498,7 @@ void __libc_start_init(void)
 {
 	do_init_fini(main_ctor_queue);
 	if (!__malloc_replaced && main_ctor_queue != builtin_ctor_queue)
-		free(main_ctor_queue);
+		__ldso_free(main_ctor_queue);
 	main_ctor_queue = 0;
 }
 
@@ -1881,7 +1886,7 @@ void __dls3(size_t *sp)
 
 	update_tls_size();
 	if (libc.tls_size > sizeof builtin_tls || tls_align > MIN_TLS_ALIGN) {
-		void *initial_tls = calloc(libc.tls_size, 1);
+		void *initial_tls = __ldso_calloc(libc.tls_size, 1);
 		if (!initial_tls) {
 			dprintf(2, "%s: Error getting %zu bytes thread-local storage: %m\n",
 				argv[0], libc.tls_size);
@@ -1944,7 +1949,7 @@ static void prepare_lazy(struct dso *p)
 		size_t i=0; search_vec(p->dynv, &i, DT_MIPS_SYMTABNO);
 		n += i-j;
 	}
-	p->lazy = calloc(n, 3*sizeof(size_t));
+	p->lazy = __ldso_calloc(n, 3*sizeof(size_t));
 	if (!p->lazy) {
 		error("Error preparing lazy relocation for %s: %m", p->name);
 		longjmp(*rtld_fail, 1);
@@ -1991,17 +1996,17 @@ void *dlopen(const char *file, int mode)
 			next = p->next;
 			while (p->td_index) {
 				void *tmp = p->td_index->next;
-				free(p->td_index);
+				__ldso_free(p->td_index);
 				p->td_index = tmp;
 			}
-			free(p->funcdescs);
+			__ldso_free(p->funcdescs);
 			if (p->rpath != p->rpath_orig)
-				free(p->rpath);
-			free(p->deps);
+				__ldso_free(p->rpath);
+			__ldso_free(p->deps);
 			unmap_library(p);
-			free(p);
+			__ldso_free(p);
 		}
-		free(ctor_queue);
+		__ldso_free(ctor_queue);
 		ctor_queue = 0;
 		if (!orig_tls_tail) libc.tls_head = 0;
 		tls_tail = orig_tls_tail;
@@ -2069,7 +2074,7 @@ end:
 	pthread_rwlock_unlock(&lock);
 	if (ctor_queue) {
 		do_init_fini(ctor_queue);
-		free(ctor_queue);
+		__ldso_free(ctor_queue);
 	}
 	pthread_setcancelstate(cs, 0);
 	return p;

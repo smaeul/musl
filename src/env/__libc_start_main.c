@@ -7,6 +7,7 @@
 #include "atomic.h"
 #include "libc.h"
 
+extern int __real_malloc;
 static void dummy(void) {}
 weak_alias(dummy, _init);
 
@@ -89,6 +90,7 @@ static int libc_start_main_stage2(int (*main)(int,char **,char **), int argc, ch
 {
 	char **envp = argv+argc+1;
 	__libc_start_init();
+	__real_malloc = 1;
 
 	/* Pass control to the application */
 	exit(main(argc, argv, envp));

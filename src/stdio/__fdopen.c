@@ -6,6 +6,8 @@
 #include <string.h>
 #include "libc.h"
 
+void *__ldso_malloc(size_t);
+
 FILE *__fdopen(int fd, const char *mode)
 {
 	FILE *f;
@@ -18,7 +20,7 @@ FILE *__fdopen(int fd, const char *mode)
 	}
 
 	/* Allocate FILE+buffer or fail */
-	if (!(f=malloc(sizeof *f + UNGET + BUFSIZ))) return 0;
+	if (!(f=__ldso_malloc(sizeof *f + UNGET + BUFSIZ))) return 0;
 
 	/* Zero-fill only the struct, not the buffer */
 	memset(f, 0, sizeof *f);

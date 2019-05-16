@@ -4,6 +4,8 @@
 #include <inttypes.h>
 #include <errno.h>
 
+void *__ldso_realloc(void*, size_t);
+
 ssize_t getdelim(char **restrict s, size_t *restrict n, int delim, FILE *restrict f)
 {
 	char *tmp;
@@ -35,10 +37,10 @@ ssize_t getdelim(char **restrict s, size_t *restrict n, int delim, FILE *restric
 		if (i+k >= *n) {
 			size_t m = i+k+2;
 			if (!z && m < SIZE_MAX/4) m += m/2;
-			tmp = realloc(*s, m);
+			tmp = __ldso_realloc(*s, m);
 			if (!tmp) {
 				m = i+k+2;
-				tmp = realloc(*s, m);
+				tmp = __ldso_realloc(*s, m);
 				if (!tmp) {
 					/* Copy as much as fits and ensure no
 					 * pushback remains in the FILE buf. */

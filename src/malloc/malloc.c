@@ -20,6 +20,7 @@ static struct {
 	volatile int free_lock[2];
 } mal;
 
+int __real_malloc;
 int __malloc_replaced;
 
 /* Synchronization tools */
@@ -281,7 +282,7 @@ static void trim(struct chunk *self, size_t n)
 	__bin_chunk(split);
 }
 
-void *malloc(size_t n)
+void *__libc_malloc(size_t n)
 {
 	struct chunk *c;
 	int i, j;
@@ -330,6 +331,16 @@ void *malloc(size_t n)
 	return CHUNK_TO_MEM(c);
 }
 
+void *__ldso_malloc(size_t n)
+{
+	return (!__real_malloc ? __libc_malloc : malloc)(n);
+}
+
+void *malloc(size_t n)
+{
+	return __libc_malloc(n);
+}
+
 static size_t mal0_clear(char *p, size_t pagesz, size_t n)
 {
 #ifdef __GNUC__
@@ -348,14 +359,14 @@ static size_t mal0_clear(char *p, size_t pagesz, size_t n)
 	}
 }
 
-void *calloc(size_t m, size_t n)
+void *__libc_calloc(size_t m, size_t n)
 {
 	if (n && m > (size_t)-1/n) {
 		errno = ENOMEM;
 		return 0;
 	}
 	n *= m;
-	void *p = malloc(n);
+	void *p = __libc_malloc(n);
 	if (!p) return p;
 	if (!__malloc_replaced) {
 		if (IS_MMAPPED(MEM_TO_CHUNK(p)))
@@ -366,13 +377,23 @@ void *calloc(size_t m, size_t n)
 	return memset(p, 0, n);
 }
 
-void *realloc(void *p, size_t n)
+void *__ldso_calloc(size_t m, size_t n)
+{
+	return (!__real_malloc ? __libc_calloc : calloc)(m, n);
+}
+
+void *calloc(size_t m, size_t n)
+{
+	return __libc_calloc(m, n);
+}
+
+void *__libc_realloc(void *p, size_t n)
 {
 	struct chunk *self, *next;
 	size_t n0, n1;
 	void *new;
 
-	if (!p) return malloc(n);
+	if (!p) return __libc_malloc(n);
 
 	if (adjust_size(&n) < 0) return 0;
 
@@ -386,7 +407,7 @@ void *realloc(void *p, size_t n)
 		size_t newlen = n + extra;
 		/* Crash on realloc of freed chunk */
 		if (extra & 1) a_crash();
-		if (newlen < PAGE_SIZE && (new = malloc(n-OVERHEAD))) {
+		if (newlen < PAGE_SIZE && (new = __libc_malloc(n-OVERHEAD))) {
 			n0 = n;
 			goto copy_free_ret;
 		}
@@ -429,12 +450,22 @@ void *realloc(void *p, size_t n)
 
 copy_realloc:
 	/* As a last resort, allocate a new chunk and copy to it. */
-	new = malloc(n-OVERHEAD);
+	new = __libc_malloc(n-OVERHEAD);
 	if (!new) return 0;
 copy_free_ret:
 	memcpy(new, p, n0-OVERHEAD);
 	free(CHUNK_TO_MEM(self));
 	return new;
+}
+
+void *__ldso_realloc(void *p, size_t n)
+{
+	return (!__real_malloc ? __libc_realloc : realloc)(p, n);
+}
+
+void *realloc(void *p, size_t n)
+{
+	return __libc_realloc(p, n);
 }
 
 void __bin_chunk(struct chunk *self)
@@ -516,7 +547,7 @@ static void unmap_chunk(struct chunk *self)
 	__munmap(base, len);
 }
 
-void free(void *p)
+void __libc_free(void *p)
 {
 	if (!p) return;
 
@@ -526,6 +557,16 @@ void free(void *p)
 		unmap_chunk(self);
 	else
 		__bin_chunk(self);
+}
+
+void __ldso_free(void *p)
+{
+	return (!__real_malloc ? __libc_free : free)(p);
+}
+
+void free(void *p)
+{
+	__libc_free(p);
 }
 
 void __malloc_donate(char *start, char *end)

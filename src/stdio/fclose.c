@@ -1,6 +1,8 @@
 #include "stdio_impl.h"
 #include <stdlib.h>
 
+void __ldso_free(void*);
+
 static void dummy(FILE *f) { }
 weak_alias(dummy, __unlist_locked_file);
 
@@ -31,8 +33,8 @@ int fclose(FILE *f)
 	if (*head == f) *head = f->next;
 	__ofl_unlock();
 
-	free(f->getln_buf);
-	free(f);
+	__ldso_free(f->getln_buf);
+	__ldso_free(f);
 
 	return r;
 }
