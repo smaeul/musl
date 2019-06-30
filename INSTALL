@@ -76,8 +76,8 @@ and ABI combinations:
 
 * PowerPC64
     * Both little and big endian variants are supported
-    * Compiler toolchain must provide 64-bit long double, not IBM
-      double-double or IEEE quad
+    * Compiler toolchain must provide 64-bit or 128-bit IEEE long
+      double, not IBM double-double
     * Compiler toolchain must use the new (ELFv2) ABI regardless of
       whether it is for little or big endian
 
