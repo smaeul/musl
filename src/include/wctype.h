@@ -1,9 +1,7 @@
-#ifndef WCHAR_H
-#define WCHAR_H
+#ifndef WCTYPE_H
+#define WCTYPE_H
 
-#define __DEFINED_struct__IO_FILE
-
-#include "../../include/wchar.h"
+#include "../../include/wctype.h"
 
 #ifndef _NO_BUILTIN_ISWALNUM
 #undef  iswalnum

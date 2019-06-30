@@ -42,7 +42,7 @@ $0 ~ /^[[:alnum:]]+ .*[[:alnum:]]\(.+\)$/ && match($0, pattern) {
 
 END {
   for (fn in fns)
-    printf("-fno-builtin-%s ", fn)
+    printf("-D_NO_BUILTIN_%s -fno-builtin-%s ", toupper(fn), fn)
   printf("\n")
 }
 
