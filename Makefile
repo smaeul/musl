@@ -88,7 +88,7 @@ all: $(ALL_LIBS) $(ALL_TOOLS)
 
 OBJ_DIRS = $(sort $(patsubst %/,%,$(dir $(ALL_LIBS) $(ALL_TOOLS) $(ALL_OBJS) $(GENH) $(GENH_INT))) obj/include)
 
-$(ALL_LIBS) $(ALL_TOOLS) $(ALL_OBJS) $(ALL_OBJS:%.o=%.lo) $(GENH) $(GENH_INT): | $(OBJ_DIRS)
+$(ALL_LIBS) $(ALL_TOOLS) $(ALL_OBJS) $(ALL_OBJS:%.o=%.flags) $(ALL_OBJS:%.o=%.lo) $(GENH) $(GENH_INT): | $(OBJ_DIRS)
 
 $(OBJ_DIRS):
 	mkdir -p $@
@@ -138,14 +138,20 @@ else
 	AS_CMD = $(CC_CMD)
 endif
 
+obj/builtins.awk: $(srcdir)/tools/builtins.sh | $(OBJ_DIRS)
+	$(srcdir)/tools/builtins.sh > $@
+
+obj/%.flags: obj/builtins.awk $(srcdir)/%.c
+	awk -f $^ > $@
+
 obj/%.o: $(srcdir)/%.s
 	$(AS_CMD)
 
 obj/%.o: $(srcdir)/%.S
 	$(CC_CMD)
 
-obj/%.o: $(srcdir)/%.c $(GENH) $(IMPH)
-	$(CC_CMD)
+obj/%.o: $(srcdir)/%.c obj/%.flags $(GENH) $(IMPH)
+	$(CC_CMD) $(file < obj/$*.flags)
 
 obj/%.lo: $(srcdir)/%.s
 	$(AS_CMD)
@@ -153,8 +159,8 @@ obj/%.lo: $(srcdir)/%.s
 obj/%.lo: $(srcdir)/%.S
 	$(CC_CMD)
 
-obj/%.lo: $(srcdir)/%.c $(GENH) $(IMPH)
-	$(CC_CMD)
+obj/%.lo: $(srcdir)/%.c obj/%.flags $(GENH) $(IMPH)
+	$(CC_CMD) $(file < obj/$*.flags)
 
 lib/libc.so: $(LOBJS) $(LDSO_OBJS)
 	$(CC) $(CFLAGS_ALL) $(LDFLAGS_ALL) -nostdlib -shared \
@@ -233,3 +239,4 @@ distclean: clean
 	rm -f config.mak
 
 .PHONY: all clean install install-libs install-headers install-tools
+.SECONDARY:
