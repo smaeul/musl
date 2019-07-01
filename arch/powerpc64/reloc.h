@@ -6,7 +6,13 @@
 #define ENDIAN_SUFFIX ""
 #endif
 
-#define LDSO_ARCH "powerpc64" ENDIAN_SUFFIX
+#if __LDBL_MANT_DIG__ == 113
+#define FP_SUFFIX "-ieee128"
+#else
+#define FP_SUFFIX ""
+#endif
+
+#define LDSO_ARCH "powerpc64" ENDIAN_SUFFIX FP_SUFFIX
 
 #define TPOFF_K (-0x7000)
 

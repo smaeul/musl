@@ -652,6 +652,7 @@ test "$ARCH" = "microblaze" && trycppif __MICROBLAZEEL__ "$t" \
 if test "$ARCH" = "powerpc64" ; then
 trycppif "_CALL_ELF == 2" "$t" || fail "$0: error: unsupported powerpc64 ABI"
 trycppif __LITTLE_ENDIAN__ "$t" && SUBARCH=${SUBARCH}le
+trycppif "__LDBL_MANT_DIG__ == 113" "$t" && SUBARCH=${SUBARCH}-ieee128
 trycppif _SOFT_FLOAT "$t" && fail "$0: error: soft-float not supported on powerpc64"
 fi
 
